@@ -1,5 +1,9 @@
 
-# Library structures of NASC-seq
+# Analysis of NASC-seq
+
+The NASC-seq datasets are from Rickard Sandberg lab (GSE128273) and Tang lab
+
+# Library structures of NASC-seq (Tang lab)
 
 ## 20220113 and 20220321
 
