@@ -4,9 +4,39 @@ outdir = "results/prepare"
 
 rule all:
     input:
-        # expand(outdir + "/cutadapt/{run_cell}_1.fastq.gz", run_cell=run_cells),
+        # expand(outdir + "/download/GSE128273_NASCseq_K562/sra/{cell}.sra", cell=cells_gse127273),
+        expand(outdir + "/download/GSE128273_NASCseq_K562/fastq/{cell}_{r}.fastq.gz", cell=cells_gse127273, r=["1", "2"]),
+        expand(outdir + "/cutadapt/{run_cell}_{r}.fastq.gz", run_cell=run_cells, r=["1", "2"]),
         expand(outdir + "/bowtie2/{run_cell}.bam", run_cell=run_cells),
 
+### GSE128273
+
+rule prefetch:
+    output:
+        sra = outdir + "/download/GSE128273_NASCseq_K562/sra/{cell}.sra"
+    log:
+        outdir + "/download/GSE128273_NASCseq_K562/sra/{cell}.log"
+    shell:
+        """
+        prefetch -o {output.sra} {wildcards.cell} &> {log}
+        """
+
+rule sra2fq:
+    input:
+        sra = rules.prefetch.output.sra
+    output:
+        tmp1 = outdir + "/download/GSE128273_NASCseq_K562/fastq/{cell}_1.fastq",
+        tmp2 = outdir + "/download/GSE128273_NASCseq_K562/fastq/{cell}_2.fastq",
+        fq1 = outdir + "/download/GSE128273_NASCseq_K562/fastq/{cell}_1.fastq.gz",
+        fq2 = outdir + "/download/GSE128273_NASCseq_K562/fastq/{cell}_2.fastq.gz"
+    log:
+        outdir + "/download/GSE128273_NASCseq_K562/fastq/{cell}.log"
+    shell:
+        """(
+        fasterq-dump --threads {threads} --split-3 --outdir `dirname {output.fq1}` {input.sra}
+        pigz -p {threads} -c {output.tmp1} > {output.fq1}
+        pigz -p {threads} -c {output.tmp2} > {output.fq2} ) &> {log}
+        """
 
 rule cutadapt:
     input:
@@ -29,8 +59,8 @@ rule cutadapt:
 
 rule cutadapt_GSE128273:
     input:
-        fq1 = "data/GSE128273_NASCseq_K562/{cell}_1.fastq.gz",
-        fq2 = "data/GSE128273_NASCseq_K562/{cell}_2.fastq.gz"
+        fq1 = outdir + "/download/GSE128273_NASCseq_K562/fastq/{cell}_1.fastq.gz",
+        fq2 = outdir + "/download/GSE128273_NASCseq_K562/fastq/{cell}_2.fastq.gz"
     output:
         fq1 = outdir + "/cutadapt/GSE128273_NASCseq_K562/{cell}_1.fastq.gz",
         fq2 = outdir + "/cutadapt/GSE128273_NASCseq_K562/{cell}_2.fastq.gz"
@@ -61,7 +91,8 @@ rule bowtie2: # remove rRNA
         8
     shell:
         """(
-        bowtie2 -p {threads} --local --no-unal --un-conc-gz {params.prefix}.fastq.gz -x {input.idx}/ref -1 {input.fq1} -2 {input.fq2} \
+        bowtie2 -p {threads} --local --no-unal --un-conc-gz {params.prefix}.fastq.gz \
+            -x {input.idx}/ref -1 {input.fq1} -2 {input.fq2} \
             | samtools view -@ {threads} -u - \
             | samtools sort -@ {threads} -T {params.prefix}_TMP - > {output.bam}
         samtools index -@ {threads} {output.bam}
