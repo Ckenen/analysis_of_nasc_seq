@@ -7,8 +7,8 @@ rule all:
     input:
         #expand(outdir + "/events/{run_cell}.bam", run_cell=run_cells),
         expand(outdir + "/ratio/{run_cell}.tsv", run_cell=run_cells),
-        expand(outdir + "/marked_nascent/{run_cell}.bam", run_cell=run_cells),
-        expand(outdir + "/expression/fpkm/{run_cell}.tsv", run_cell=run_cells[:1]),
+        # expand(outdir + "/marked_nascent/{run_cell}.bam", run_cell=run_cells),
+        # expand(outdir + "/expression/fpkm/{run_cell}.tsv", run_cell=run_cells[:1]),
 
 # Events
 

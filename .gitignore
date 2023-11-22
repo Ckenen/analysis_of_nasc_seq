@@ -8,6 +8,9 @@ GSE128273_NASCseq_K562/
 datasets/
 rawdata/
 trash/
+Data180404.tar.gz
+media/
+GSE128273_NASCseq_SE.tar.gz
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

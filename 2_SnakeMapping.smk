@@ -1,5 +1,6 @@
 #!/usr/bin/env runsnakemake
 include: "0_SnakeCommon.smk"
+run_cells = run_cells
 indir = "results/prepare/bowtie2"
 outdir = "results/mapping"
 
@@ -7,21 +8,29 @@ rule all:
     input:
         expand(outdir + "/star/{run_cell}", run_cell=run_cells),
         # expand(outdir + "/filtered/{run_cell}.bam", run_cell=run_cells),
-        expand(outdir + "/filtered/{run_cell}.flagstat", run_cell=run_cells),
         expand(outdir + "/infer_experiment/{run_cell}.txt", run_cell=run_cells),
         # expand(outdir + "/marked_duplicates/{run_cell}.bam", run_cell=run_cells),
-        expand(outdir + "/marked_duplicates/{run_cell}.flagstat", run_cell=run_cells),
         expand(outdir + "/marked_strand/{run_cell}.bam", run_cell=run_cells),
-        expand(outdir + "/marked_strand/{run_cell}.flagstat", run_cell=run_cells),
-        outdir + "/all_samples_final_reads.tsv",
+        #expand(outdir + "/marked_strand/{run_cell}.flagstat", run_cell=run_cells),
+        #outdir + "/all_samples_final_reads.tsv",
  
 # STAR --genomeLoad LoadAndExit --genomeDir /home/chenzonggui/species/homo_sapiens/GRCh38.p13/GRCh38.canonical.v39.STAR.index --limitBAMsortRAM 150000000000
 # STAR --genomeLoad Remove --genomeDir /home/chenzonggui/species/homo_sapiens/GRCh38.p13/GRCh38.canonical.v39.STAR.index
 
-rule star_mapping:
+def get_fastqs(wildcards):
+    run, cell = wildcards.run, wildcards.cell
+    layout = get_layout(cell)
+    if layout == "PE":
+        paths = [
+            indir + "/%s/%s.1.fastq.gz" % (run, cell),
+            indir + "/%s/%s.2.fastq.gz" % (run, cell)]
+    else:
+        paths = [indir + "/%s/%s.fastq.gz" % (run, cell)]
+    return paths
+
+rule star_mapping_pe:
     input:
-        fq1 = indir + "/{run}/{cell}.1.fastq.gz",
-        fq2 = indir + "/{run}/{cell}.2.fastq.gz",
+        fqs = lambda wildcards: get_fastqs(wildcards),
         idx = STAR_GENOME_INDEX
     output:
         out = directory(outdir + "/star/{run}/{cell}")
@@ -42,21 +51,24 @@ rule star_mapping:
             --outSAMtype BAM SortedByCoordinate \
             --genomeLoad LoadAndKeep \
             --limitBAMsortRAM 150000000000 \
-            --readFilesIn {input.fq1} {input.fq2}
+            --readFilesIn {input.fqs}
         samtools index -@ {threads} {params.prefix}.Aligned.sortedByCoord.out.bam ) &> {log}
         """
 
 rule filter_bam:
     input:
-        bamdir = rules.star_mapping.output.out
+        bamdir = outdir + "/star/{run}/{cell}"
     output:
         bam = outdir + "/filtered/{run}/{cell}.bam"
+    params:
+        flag = lambda wildcards: "-f 2 -F 2308" if get_layout(wildcards.cell) == "PE" else "-F 2308"
     threads:
         4
     shell:
         """
-        samtools view -@ {threads} --expr 'rname =~ "^chr([0-9]+|[XY])$"' -q 30 -d "NH:1" -f 2 -F 2308 \
-            -o {output.bam} {input.bamdir}/{wildcards.cell}.Aligned.sortedByCoord.out.bam
+        samtools view -@ {threads} --expr 'rname =~ "^chr([0-9]+|[XY])$"' \
+            -q 30 -d "NH:1" {params.flag} -o {output.bam} \
+            {input.bamdir}/{wildcards.cell}.Aligned.sortedByCoord.out.bam
         samtools index -@ {threads} {output.bam}
         """
 
@@ -94,11 +106,13 @@ rule mark_strand:
     output:
         bam = outdir + "/marked_strand/{run}/{cell}.bam",
         txt = outdir + "/marked_strand/{run}/{cell}.tsv"
+    params:
+        layout = lambda wildcards: get_layout(wildcards.cell)
     log:
         outdir + "/marked_strand/{run}/{cell}.log"
     shell:
         """
-        nasctools MarkStrand --gene {input.bed} --tag ST --layout PE --strand U \
+        nasctools MarkStrand --gene {input.bed} --tag ST --layout {params.layout} --strand U \
             --summary {output.txt} {input.bam} {output.bam} &> {log}
         samtools index {output.bam}
         """

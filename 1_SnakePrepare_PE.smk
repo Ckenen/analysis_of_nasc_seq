@@ -1,5 +1,6 @@
 #!/usr/bin/env runsnakemake
 include: "0_SnakeCommon.smk"
+run_cells = run_cells_pe
 outdir = "results/prepare"
 
 rule all:
@@ -38,25 +39,6 @@ rule sra2fq:
         pigz -p {threads} -c {output.tmp2} > {output.fq2} ) &> {log}
         """
 
-rule cutadapt:
-    input:
-        fq1 = "data/datasets/{cell}_1.fastq.gz",
-        fq2 = "data/datasets/{cell}_2.fastq.gz"
-    output:
-        fq1 = outdir + "/cutadapt/{run}/{cell}_1.fastq.gz",
-        fq2 = outdir + "/cutadapt/{run}/{cell}_2.fastq.gz"
-    log:
-        outdir + "/cutadapt/{run}/{cell}.log"
-    threads:
-        8
-    shell:
-        """
-        cutadapt -j {threads} -q 30 -m 20 \
-            -g GTGTATAAGAGACAG -g ATCAACGCAGAGTAC -a CTGTCTCTTATACAC -a GTACTCTGCGTTGAT \
-            -G GTGTATAAGAGACAG -G ATCAACGCAGAGTAC -A CTGTCTCTTATACAC -A GTACTCTGCGTTGAT \
-            -o {output.fq1} -p {output.fq2} {input.fq1} {input.fq2} &> {log}
-        """
-
 rule cutadapt_GSE128273:
     input:
         fq1 = outdir + "/download/GSE128273_NASCseq_K562/fastq/{cell}_1.fastq.gz",
@@ -75,6 +57,29 @@ rule cutadapt_GSE128273:
             -G GTGTATAAGAGACAG -G GCAGAGTACGGG -A CTGTCTCTTATACAC -A CCCGTACTCTGC \
             -o {output.fq1} -p {output.fq2} {input.fq1} {input.fq2} &> {log}
         """
+
+# Tanglab
+
+rule cutadapt_tanglab:
+    input:
+        fq1 = "data/datasets/{cell}_1.fastq.gz",
+        fq2 = "data/datasets/{cell}_2.fastq.gz"
+    output:
+        fq1 = outdir + "/cutadapt/{run}/{cell}_1.fastq.gz",
+        fq2 = outdir + "/cutadapt/{run}/{cell}_2.fastq.gz"
+    log:
+        outdir + "/cutadapt/{run}/{cell}.log"
+    threads:
+        8
+    shell:
+        """
+        cutadapt -j {threads} -q 30 -m 20 \
+            -g GTGTATAAGAGACAG -g ATCAACGCAGAGTAC -a CTGTCTCTTATACAC -a GTACTCTGCGTTGAT \
+            -G GTGTATAAGAGACAG -G ATCAACGCAGAGTAC -A CTGTCTCTTATACAC -A GTACTCTGCGTTGAT \
+            -o {output.fq1} -p {output.fq2} {input.fq1} {input.fq2} &> {log}
+        """
+
+# Common
 
 rule bowtie2: # remove rRNA
     input:
